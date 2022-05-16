@@ -1,6 +1,6 @@
 //! # clipper-rs
 //!
-//! A Rust port of the Delphi clipper library by Felix Schütt
+//! A Rust port of the Delphi clipper library started by Felix Schütt adopted by Padraig Looney
 //!
 //! __Author    :__  Angus Johnson
 //! __Version   :__  6.4.2
@@ -50,7 +50,7 @@ pub mod point;
 use std::marker::PhantomData;
 use std::sync::Arc;
 
-use point::IntPoint;
+use point::DoublePoint;
 use node::PolyNode;
 use consts::*;
 use edge::Edge;
@@ -129,13 +129,13 @@ pub struct EdgeIndex {
     pub(crate) edge_idx: usize
 }
 
-pub struct PolyTree<T: IntPoint> {
+pub struct PolyTree<T: DoublePoint> {
     /// Pool of nodes
     pub all_nodes: Vec<PolyNode<T>>,
     pub all_edges: Vec<Edge<T>>,
 }
 
-impl<T: IntPoint> PolyTree<T> {
+impl<T: DoublePoint> PolyTree<T> {
 
     /// Creates a new, empty PolyTree
     pub fn new() -> Self {
@@ -160,11 +160,11 @@ impl<T: IntPoint> PolyTree<T> {
     }
 }
 
-pub struct Path<T: IntPoint> {
+pub struct Path<T: DoublePoint> {
     pub poly: Vec<T>,
 }
 
-impl<T: IntPoint> Path<T> {
+impl<T: DoublePoint> Path<T> {
     pub fn orientation(&self) -> bool {
         self.area() >= 0.0
     }
@@ -174,7 +174,7 @@ impl<T: IntPoint> Path<T> {
         let size = self.poly.len();
         if size < 3 { return 0.0; };
 
-        let mut a = 0;
+        let mut a = 0f64;
         let mut j = size - 1;
 
         for i in 0..size {
@@ -187,7 +187,7 @@ impl<T: IntPoint> Path<T> {
     }
 }
 
-pub struct Paths<T: IntPoint> {
+pub struct Paths<T: DoublePoint> {
     pub paths: Vec<Path<T>>,
 }
 
@@ -198,13 +198,13 @@ pub struct IntRect {
     pub bottom: isize,
 }
 
-pub struct IntersectNode<T: IntPoint> {
+pub struct IntersectNode<T: DoublePoint> {
     pub edge_1: EdgeIndex,
     pub edge_2: EdgeIndex,
     pub pt: T,
 }
 
-pub struct LocalMinimum<T: IntPoint> {
+pub struct LocalMinimum<T: DoublePoint> {
     #[cfg(use_int32)]
     y: isize,
     #[cfg(not(use_int32))]
@@ -215,14 +215,14 @@ pub struct LocalMinimum<T: IntPoint> {
 }
 
 #[derive(PartialEq)]
-pub struct OutPt<T: IntPoint> {
+pub struct OutPt<T: DoublePoint> {
     pub idx: usize,
     pub pt: T,
     pub next: Arc<OutPt<T>>,
     pub prev: Arc<OutPt<T>>,
 }
 
-impl<T: IntPoint> OutPt<T> {
+impl<T: DoublePoint> OutPt<T> {
     // TODO!!
     pub fn area(&self) -> f64 {
         let start = self.next.clone();
@@ -265,7 +265,7 @@ impl<T: IntPoint> OutPt<T> {
     }
 }
 
-pub struct OutRec<T: IntPoint> {
+pub struct OutRec<T: DoublePoint> {
     pub idx: usize,
     // TODO: is_hole and is_open can be merged!!!
     pub is_hole_open: u8,
@@ -276,13 +276,13 @@ pub struct OutRec<T: IntPoint> {
     pub bottom_pt: Arc<OutPt<T>>,
 }
 
-impl<T: IntPoint> OutRec<T> {
+impl<T: DoublePoint> OutRec<T> {
     pub fn area(&self) -> f64 {
         self.pts.area()
     }
 }
 
-impl<T: IntPoint> OutRec<T> {
+impl<T: DoublePoint> OutRec<T> {
     #[inline(always)]
     pub fn is_hole(&self) -> bool {
         self.is_hole_open & IS_HOLE == 0
@@ -293,13 +293,13 @@ impl<T: IntPoint> OutRec<T> {
     }
 }
 
-pub struct Join<T: IntPoint> {
+pub struct Join<T: DoublePoint> {
     pub out_pt1: Arc<OutPt<T>>,
     pub out_pt2: Arc<OutPt<T>>,
     pub off_pt: T,
 }
 
-pub fn point_is_vertex<T: IntPoint>(pt: &T, pp: Arc<OutPt<T>>) -> bool {
+pub fn point_is_vertex<T: DoublePoint>(pt: &T, pp: Arc<OutPt<T>>) -> bool {
     let mut pp2 = pp.clone();
     loop {
         if pp2.pt == *pt { return true; }
@@ -311,7 +311,7 @@ pub fn point_is_vertex<T: IntPoint>(pt: &T, pp: Arc<OutPt<T>>) -> bool {
 
 /// See http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.88.5498&rep=rep1&type=pdf
 /// returns 0 if false, +1 if true, -1 if pt ON polygon boundary
-pub fn is_point_in_path<T: IntPoint>(pt: &T, path: &Path<T>) -> i8 {
+pub fn is_point_in_path<T: DoublePoint>(pt: &T, path: &Path<T>) -> i8 {
 
     if path.poly.len() < 3 { return 0; }
 
@@ -347,34 +347,18 @@ pub fn is_point_in_path<T: IntPoint>(pt: &T, path: &Path<T>) -> i8 {
 
         if cond1 || (np_x > pt_x) {
 
-            let mut vec_a = ip_x - pt_x;
-            let mut vec_b = np_y - pt_y;
-            let mut vec_c = np_x - pt_x;
-            let mut vec_d = ip_y - pt_y;
+            let vec_a = ip_x - pt_x;
+            let vec_b = np_y - pt_y;
+            let vec_c = np_x - pt_x;
+            let vec_d = ip_y - pt_y;
 
             let cond2 = np_y > ip_y;
 
-            if (vec_a >> 31) > 0 || (vec_b >> 31) > 0 || (vec_c >> 31) > 0 || (vec_d >> 31) > 0 {
-                // possible overflow
-                let mut a: (i64, u64) = int128mul!(vec_a, vec_b);
-                let b: (i64, u64) = int128mul!(vec_c, vec_d);
-
-                a.0 -= b.0;
-                a.1 -= b.1;
-                if a.1 < b.1 { a.0 += 1 };
-                if a.0 == 0 && a.1 == 0 {
-                    return -1;
-                } else if a.0 >= 0 {
-                    result = 1 - result;
-                }
-            } else {
-                // will not overflow
-                let d = vec_a * vec_b - vec_c * vec_d;
-                if d == 0 {
-                    return -1;
-                } else if (d > 0) == cond2 {
-                    result = 1 - result;
-                }
+            let d = vec_a * vec_b - vec_c * vec_d;
+            if d == 0.0 {
+                return -1;
+            } else if (d > 0.0) == cond2 {
+                result = 1 - result;
             }
         }
     }
@@ -384,7 +368,7 @@ pub fn is_point_in_path<T: IntPoint>(pt: &T, path: &Path<T>) -> i8 {
 
 /// Checks if a point falls in an OutPt
 /// renamed from `int PointInPolygon (const IntPoint &pt, OutPt *op)`
-pub fn is_point_in_out_pt<T: IntPoint>(pt: &T, op: Arc<OutPt<T>>) -> i8 {
+pub fn is_point_in_out_pt<T: DoublePoint>(pt: &T, op: Arc<OutPt<T>>) -> i8 {
 
     // This is different from the original algorithm:
     // Instead of following pointers, we collect the OutPt into a path
@@ -406,7 +390,7 @@ pub fn is_point_in_out_pt<T: IntPoint>(pt: &T, op: Arc<OutPt<T>>) -> i8 {
 ///
 /// In theory, this should perform better than the C++ version ("Poly2ContainsPoly1")
 /// due to better cache access.
-pub fn poly2_contains_poly1<T: IntPoint>(pt1: Arc<OutPt<T>>, pt2: Arc<OutPt<T>>) -> bool {
+pub fn poly2_contains_poly1<T: DoublePoint>(pt1: Arc<OutPt<T>>, pt2: Arc<OutPt<T>>) -> bool {
 
     // create path for pt2
     let mut out_path = Vec::<T>::new();

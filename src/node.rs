@@ -1,10 +1,10 @@
-use point::IntPoint;
+use point::DoublePoint;
 use {PolyTree, Path, PolyNodeIndex, JoinType, EndType};
 
 // TODO: This system should not rely on IDs, rather on Arc<> references
 // Clean up!!
 
-pub struct PolyNode<T: IntPoint> {
+pub struct PolyNode<T: DoublePoint> {
     /// Reference to the tree the node is located in
     pub tree: ::std::sync::Arc<::std::sync::Mutex<PolyTree<T>>>,
     /// The index in the global node memory pool
@@ -19,7 +19,7 @@ pub struct PolyNode<T: IntPoint> {
     pub end_type: EndType,
 }
 
-impl<T: IntPoint> PolyNode<T> {
+impl<T: DoublePoint> PolyNode<T> {
 
     pub(crate) fn get_next(&self) -> Option<PolyNodeIndex> {
         // TODO

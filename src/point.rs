@@ -57,15 +57,41 @@ impl IntPoint for IntPoint3d {
     fn set_z(&mut self, z: CInt) { self.z = z; }
 }
 
-pub trait DoublePoint {
+pub trait DoublePoint: PartialEq + Copy + Clone{
+    fn new(x: f64, y: f64) -> Self;
     fn get_x(&self) -> f64;
     fn get_y(&self) -> f64;
+    fn get_z(&self) -> Option<f64>;
+    fn set_x(&mut self, x: f64);
+    fn set_y(&mut self, y: f64);
+    fn set_z(&mut self, z: f64);
+
+    #[inline]
+    fn get_dx(&self, other: &Self) -> f64 {
+        if self.get_y() == other.get_y() {
+            ::consts::HORIZONTAL
+        } else {
+            (other.get_x() - self.get_x()) / 
+            (other.get_y() - self.get_y()) 
+        }
+    }
 }
 
+#[derive(Copy, Clone, PartialEq)]
 #[repr(packed)]
 pub struct DoublePoint2d {
   pub x: f64,
   pub y: f64,
+}
+
+impl DoublePoint for DoublePoint2d {
+    fn new(x: f64, y: f64) -> Self { Self { x: x, y: y } }
+    fn get_x(&self) -> f64 { self.x }
+    fn get_y(&self) -> f64 { self.y }
+    fn get_z(&self) -> Option<f64> { None }
+    fn set_x(&mut self, x: f64) { self.x = x; }
+    fn set_y(&mut self, y: f64) { self.y = y; }
+    fn set_z(&mut self, _z: f64) { }
 }
 
 impl From<IntPoint2d> for DoublePoint2d {
@@ -77,13 +103,7 @@ impl From<IntPoint2d> for DoublePoint2d {
     }
 }
 
-impl DoublePoint for DoublePoint2d {
-    #[inline(always)]
-    fn get_x(&self) -> f64 { self.x }
-    #[inline(always)]
-    fn get_y(&self) -> f64 { self.y }
-}
-
+#[derive(Copy, Clone, PartialEq)]
 pub struct DoublePoint3d {
   pub x: f64,
   pub y: f64,
@@ -101,8 +121,11 @@ impl From<IntPoint3d> for DoublePoint3d {
 }
 
 impl DoublePoint for DoublePoint3d {
-    #[inline(always)]
+    fn new(x: f64, y: f64) -> Self { Self { x: x, y: y, z: 0.0 } }
     fn get_x(&self) -> f64 { self.x }
-    #[inline(always)]
     fn get_y(&self) -> f64 { self.y }
+    fn get_z(&self) -> Option<f64> { None }
+    fn set_x(&mut self, x: f64) { self.x = x; }
+    fn set_y(&mut self, y: f64) { self.y = y; }
+    fn set_z(&mut self, _z: f64) { }
 }

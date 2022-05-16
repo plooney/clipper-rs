@@ -1,7 +1,7 @@
-use point::{CInt, IntPoint};
+use point::{DoublePoint};
 use {EdgeSide, PolyType, EdgeIndex};
 
-pub struct Edge<T: IntPoint> {
+pub struct Edge<T: DoublePoint> {
     pub bot: T,
     /// current (updated for every new scanbeam)
     pub cur: T,
@@ -25,7 +25,7 @@ pub struct Edge<T: IntPoint> {
     pub prev_in_sel: EdgeIndex,
 }
 
-impl<T: IntPoint> Edge<T> {
+impl<T: DoublePoint> Edge<T> {
     #[inline]
     pub fn is_horizontal(&self) -> bool {
         self.dx == ::consts::HORIZONTAL
@@ -34,7 +34,7 @@ impl<T: IntPoint> Edge<T> {
     #[inline]
     pub fn set_dx(&mut self) {
         let dy  = self.top.get_y() - self.bot.get_y();
-        self.dx = if dy == 0 {
+        self.dx = if dy == 0f64 {
             ::consts::HORIZONTAL
         } else {
             (self.top.get_x() - self.bot.get_x()) as f64 / dy as f64
@@ -52,11 +52,11 @@ impl<T: IntPoint> Edge<T> {
     }
 
     #[inline]
-    pub fn top_x(&self, current_y: CInt) -> CInt {
+    pub fn top_x(&self, current_y: f64) -> f64 {
         if current_y == self.top.get_y() {
             self.top.get_x()
         } else {
-            self.bot.get_x() + self.dx.round() as CInt * (current_y - self.bot.get_y())
+            self.bot.get_x() + self.dx * (current_y - self.bot.get_y())
         }
     }
 
@@ -77,7 +77,7 @@ impl<T: IntPoint> Edge<T> {
                 other.bot.get_y()
             } else {
                 let b2 = other.bot.get_y() as f64 - (other.bot.get_x() as f64 / other.dx);
-                (self.bot.get_x() as f64 / other.dx + b2).round() as CInt
+                self.bot.get_x() as f64 / other.dx + b2
             };
 
             ip = T::new(self.bot.get_x(), cur_y);
@@ -90,7 +90,7 @@ impl<T: IntPoint> Edge<T> {
                 self.bot.get_y()
             } else {
                 let b2 = self.bot.get_y() as f64 - (self.bot.get_x() as f64 / self.dx);
-                (other.bot.get_x() as f64 / self.dx + b2).round() as CInt
+                other.bot.get_x() as f64 / self.dx + b2
             };
 
             ip = T::new(other.bot.get_x(), cur_y);
@@ -100,11 +100,11 @@ impl<T: IntPoint> Edge<T> {
             let b1 = (self.bot.get_x() - self.bot.get_y()) as f64 * self.dx;
             let b2 = (other.bot.get_x() - other.bot.get_y()) as f64 * other.dx;
             let q = (b2 - b1) as f64 / (self.dx - other.dx);
-            let cur_y = q.round() as CInt;
+            let cur_y = q;
             let cur_x = if self.dx.abs() < other.dx.abs() {
-                (self.dx * q + b1).round() as CInt
+                self.dx * q + b1
             } else {
-                (other.dx * q + b2).round() as CInt
+                other.dx * q + b2
             };
 
             ip = T::new(cur_x, cur_y);
@@ -126,21 +126,20 @@ impl<T: IntPoint> Edge<T> {
 
 #[inline]
 #[cfg(all(use_int32, use_int128))]
-pub fn slopes_equal_edge2<T: IntPoint>(e1: &Edge<T>, e2: &Edge<T>) -> bool {
+pub fn slopes_equal_edge2<T: DoublePoint>(e1: &Edge<T>, e2: &Edge<T>) -> bool {
     let sdy = e1.top.get_y() - e1.bot.get_y();
     let sdx = e1.top.get_x() - e1.bot.get_x();
     let edy = e2.top.get_y() - e2.bot.get_y();
     let edx = e2.top.get_x() - e2.bot.get_x();
 
-    let a: (i64, u64) = int128mul!(sdy, edx);
-    let b: (i64, u64) = int128mul!(sdx, edy);
-
-    a.0 == b.0 && a.1 == b.1
+    let a: f64 = sdy * edx;
+    let b: f64 = sdx * edy;
+    a == b
 }
 
 #[inline]
 #[cfg(not(all(use_int32, use_int128)))]
-pub fn slopes_equal_edge2<T: IntPoint>(e1: &Edge<T>, e2: &Edge<T>) -> bool {
+pub fn slopes_equal_edge2<T: DoublePoint>(e1: &Edge<T>, e2: &Edge<T>) -> bool {
     let sdy = e1.top.get_y() - e1.bot.get_y();
     let sdx = e1.top.get_x() - e1.bot.get_x();
     let edy = e2.top.get_y() - e2.bot.get_y();
@@ -150,21 +149,20 @@ pub fn slopes_equal_edge2<T: IntPoint>(e1: &Edge<T>, e2: &Edge<T>) -> bool {
 
 #[inline]
 #[cfg(all(use_int32, use_int128))]
-pub fn slopes_equal_point3<T: IntPoint>(p1: &T, p2: &T, p3: &T) -> bool {
+pub fn slopes_equal_point3<T: DoublePoint>(p1: &T, p2: &T, p3: &T) -> bool {
     let p12y = p1.get_y() - p2.get_y();
     let p12x = p1.get_x() - p2.get_x();
     let p23y = p2.get_y() - p3.get_y();
     let p23x = p2.get_x() - p3.get_x();
 
-    let a: (i64, u64) = int128mul!(p12y, p23x);
-    let b: (i64, u64) = int128mul!(p12x, p23y);
-
-    a.0 == b.0 && a.1 == b.1
+    let a: f64 = p12y * p23x;
+    let b: f64 = p12x * p23y;
+    a == b
 }
 
 #[inline]
 #[cfg(not(all(use_int32, use_int128)))]
-pub fn slopes_equal_point3<T: IntPoint>(p1: &T, p2: &T, p3: &T) -> bool {
+pub fn slopes_equal_point3<T: DoublePoint>(p1: &T, p2: &T, p3: &T) -> bool {
     let p12y = p1.get_y() - p2.get_y();
     let p12x = p1.get_x() - p2.get_x();
     let p23y = p2.get_y() - p3.get_y();
@@ -174,19 +172,19 @@ pub fn slopes_equal_point3<T: IntPoint>(p1: &T, p2: &T, p3: &T) -> bool {
 
 #[inline]
 #[cfg(all(use_int32, use_int128))]
-pub fn slopes_equal_point4<T: IntPoint>(p1: &T, p2: &T, p3: &T, p4: &T) -> bool {
+pub fn slopes_equal_point4<T: DoublePoint>(p1: &T, p2: &T, p3: &T, p4: &T) -> bool {
     let p12y = p1.get_y() - p2.get_y();
     let p12x = p1.get_x() - p2.get_x();
     let p34y = p3.get_y() - p4.get_y();
     let p34x = p3.get_x() - p4.get_x();
-    let a: (i64, u64) = int128mul!(p12y, p34x);
-    let b: (i64, u64) = int128mul!(p12x, p34y);
-    a.0 == b.0 && a.1 == b.1
+    let a: f64 = p12y * p34x;
+    let b: f64 = p12x * p34y;
+    a == b
 }
 
 #[inline]
 #[cfg(not(all(use_int32, use_int128)))]
-pub fn slopes_equal_point4<T: IntPoint>(p1: &T, p2: &T, p3: &T, p4: &T) -> bool {
+pub fn slopes_equal_point4<T: DoublePoint>(p1: &T, p2: &T, p3: &T, p4: &T) -> bool {
     let p12y = p1.get_y() - p2.get_y();
     let p12x = p1.get_x() - p2.get_x();
     let p34y = p3.get_y() - p4.get_y();
